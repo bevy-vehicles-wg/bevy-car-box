@@ -283,6 +283,7 @@ fn update_car(
                     Vec3::ZERO,
                 );
 
+                let wheel_direction = *global_wheel_transform.back();
                 let main_force = wheel_direction * mass * car_speed * delta_seconds * 0.9;
                 physics::add_external_impulse(&mut car_impulse, main_force, car_front, Vec3::ZERO);
             }
