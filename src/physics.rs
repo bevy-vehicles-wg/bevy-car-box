@@ -44,7 +44,7 @@ impl Plugin for PhysicsPlugin {
         if ENABLE_PHYSICS {
             app.add_plugins(PhysicsPlugins::default());
 
-            if DEBUG_RENDER{
+            if DEBUG_RENDER {
                 app.add_plugins(PhysicsDebugPlugin::default());
             }
         }

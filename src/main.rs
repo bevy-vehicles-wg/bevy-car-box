@@ -204,7 +204,15 @@ fn update_car(
 ) {
     let car_speed = 10.0;
     let delta_seconds = time.delta_seconds();
-    let (mut car_impulse, mut car_force, linear_velocity, angular_velocity, mass, car_transform, car) = car.single_mut();
+    let (
+        mut car_impulse,
+        mut car_force,
+        linear_velocity,
+        angular_velocity,
+        mass,
+        car_transform,
+        car,
+    ) = car.single_mut();
     let mass = physics::get_mass(mass);
 
     let linear_velocity = physics::linear_velocity(linear_velocity);
