@@ -101,6 +101,7 @@ fn setup_car(
             physics::LinearVelocity::default(),
             #[cfg(feature = "avian3d")]
             physics::AngularVelocity::default(),
+            Friction::new(1.0),
             Car {
                 angle: 0.0,
                 width: car_width,
@@ -148,6 +149,7 @@ fn setup_car(
             ..default()
         },
         ground_collider,
+        Friction::new(1.0),
     ));
 }
 
@@ -253,39 +255,65 @@ fn update_car(
     let car_front = car_transform.forward() * car.length / 2.0;
     let car_back = car_transform.back() * car.length / 2.0;
     let global_car_front = car_transform.translation + car_front;
-    let wheel_lateral = wheel.angle.sin() * global_wheel_transform.left() * 10.0;
+    let wheel_lateral = wheel.angle.sin() * global_wheel_transform.left();
     gizmos.arrow(
         global_car_front,
-        global_car_front + wheel_lateral,
+        global_car_front + wheel_lateral * 10.0,
         Color::Srgba(YELLOW),
     );
+
+    let car_direction = *car_transform.forward();
 
     for movement in events.read() {
         match movement {
             Movement::Forward => {
-                let car_direction = *car_transform.forward();
                 physics::add_external_impulse(
                     &mut car_impulse,
-                    car_direction * mass * car_speed * delta_seconds * 0.1,
+                    car_direction * mass * car_speed * delta_seconds * 2.0,
                     Vec3::ZERO,
                     Vec3::ZERO,
                 );
 
-                let main_force = wheel_direction * mass * car_speed * delta_seconds * 0.9;
-                physics::add_external_impulse(&mut car_impulse, main_force, car_front, Vec3::ZERO);
+                // the wheel dont want to go here, counter force
+                physics::add_external_impulse(
+                    &mut car_impulse,
+                    wheel_lateral * mass * car_speed * delta_seconds * 4.0,
+                    Vec3::ZERO,
+                    Vec3::ZERO,
+                );
+
+                // push the car to rotate to align the wheel direction
+                physics::add_external_impulse(
+                    &mut car_impulse,
+                    wheel_lateral * mass * car_speed * delta_seconds * 0.5,
+                    car_front,
+                    Vec3::ZERO,
+                );
             }
             Movement::Backward => {
-                let car_direction = *car_transform.back();
                 physics::add_external_impulse(
                     &mut car_impulse,
-                    car_direction * mass * car_speed * delta_seconds * 0.1,
+                    -car_direction * mass * car_speed * delta_seconds * 2.0,
                     Vec3::ZERO,
                     Vec3::ZERO,
                 );
 
-                let wheel_direction = *global_wheel_transform.back();
-                let main_force = wheel_direction * mass * car_speed * delta_seconds * 0.9;
-                physics::add_external_impulse(&mut car_impulse, main_force, car_front, Vec3::ZERO);
+                // the wheel dont want to go here, counter force
+                physics::add_external_impulse(
+                    &mut car_impulse,
+                    wheel_lateral * mass * car_speed * delta_seconds * 4.0,
+                    Vec3::ZERO,
+                    Vec3::ZERO,
+                );
+
+                // push the car to rotate to align the wheel direction
+                physics::add_external_impulse(
+                    &mut car_impulse,
+                    -wheel_lateral * mass * car_speed * delta_seconds * 0.5,
+                    car_front,
+                    Vec3::ZERO,
+                );
+
             }
             _ => (),
         }
