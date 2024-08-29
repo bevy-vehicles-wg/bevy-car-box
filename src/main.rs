@@ -88,7 +88,7 @@ fn setup_car(
                 mesh: meshes.add(Cuboid::new(car_width, car_height, car_length)),
                 material: materials.add(Color::Srgba(GREEN).with_alpha(0.5)),
                 transform: Transform {
-                    translation: vec3(0.0, 2.0, 10.0),
+                    translation: vec3(0.0, 4.0, 10.0),
                     ..default()
                 },
                 ..default()
@@ -98,7 +98,9 @@ fn setup_car(
             physics::external_impulse(),
             physics::external_force(),
             physics::rigid_body_dynamic(),
-            Velocity::default(),
+            physics::LinearVelocity::default(),
+            #[cfg(feature = "avian3d")]
+            physics::AngularVelocity::default(),
             Car {
                 angle: 0.0,
                 width: car_width,
@@ -189,8 +191,9 @@ fn update_car(
         (
             &mut ExternalImpulse,
             &mut ExternalForce,
-            &Velocity,
-            &AdditionalMassProperties,
+            &physics::LinearVelocity,
+            &physics::AngularVelocity,
+            &physics::Mass,
             &Transform,
             &Car,
         ),
@@ -201,23 +204,24 @@ fn update_car(
 ) {
     let car_speed = 10.0;
     let delta_seconds = time.delta_seconds();
-    let (mut car_impulse, mut car_force, velocity, mass, car_transform, car) = car.single_mut();
-    let AdditionalMassProperties::Mass(mass) = mass else {
-        panic!()
-    };
+    let (mut car_impulse, mut car_force, linear_velocity, angular_velocity, mass, car_transform, car) = car.single_mut();
+    let mass = physics::get_mass(mass);
+
+    let linear_velocity = physics::linear_velocity(linear_velocity);
     // this are the car velocity
     // GREEN indicates where the car will be.
     gizmos.arrow(
         car_transform.translation,
-        car_transform.translation + velocity.linvel,
+        car_transform.translation + linear_velocity,
         Color::Srgba(GREEN),
     );
 
+    let angular_velocity = physics::angular_velocity(angular_velocity);
     // BLUE indicates how much the car is spinning, It will be pointing up if spinning right, pointing down if
     // spinning left
     gizmos.arrow(
         car_transform.translation,
-        car_transform.translation + velocity.angvel,
+        car_transform.translation + angular_velocity,
         Color::Srgba(BLUE),
     );
 
@@ -254,24 +258,24 @@ fn update_car(
                 let car_direction = *car_transform.forward();
                 physics::add_external_impulse(
                     &mut car_impulse,
-                    car_direction * *mass * car_speed * delta_seconds * 0.1,
+                    car_direction * mass * car_speed * delta_seconds * 0.1,
                     Vec3::ZERO,
                     Vec3::ZERO,
                 );
 
-                let main_force = wheel_direction * *mass * car_speed * delta_seconds * 0.9;
+                let main_force = wheel_direction * mass * car_speed * delta_seconds * 0.9;
                 physics::add_external_impulse(&mut car_impulse, main_force, car_front, Vec3::ZERO);
             }
             Movement::Backward => {
                 let car_direction = *car_transform.back();
                 physics::add_external_impulse(
                     &mut car_impulse,
-                    car_direction * *mass * car_speed * delta_seconds * 0.1,
+                    car_direction * mass * car_speed * delta_seconds * 0.1,
                     Vec3::ZERO,
                     Vec3::ZERO,
                 );
 
-                let main_force = wheel_direction * *mass * car_speed * delta_seconds * 0.9;
+                let main_force = wheel_direction * mass * car_speed * delta_seconds * 0.9;
                 physics::add_external_impulse(&mut car_impulse, main_force, car_front, Vec3::ZERO);
             }
             _ => (),

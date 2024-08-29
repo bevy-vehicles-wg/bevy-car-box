@@ -7,6 +7,23 @@ pub use bevy_rapier3d::prelude::*;
 pub const ENABLE_PHYSICS: bool = true;
 pub const DEBUG_RENDER: bool = false;
 
+#[cfg(feature = "bevy_rapier3d")]
+pub type Mass = AdditionalMassProperties;
+
+#[cfg(feature = "avian3d")]
+pub type Mass = avian3d::prelude::Mass;
+
+#[cfg(feature = "bevy_rapier3d")]
+pub type LinearVelocity = bevy_rapier3d::prelude::Velocity;
+
+#[cfg(feature = "bevy_rapier3d")]
+pub type AngularVelocity = bevy_rapier3d::prelude::Velocity;
+
+#[cfg(feature = "avian3d")]
+pub type LinearVelocity = avian3d::prelude::LinearVelocity;
+#[cfg(feature = "avian3d")]
+pub type AngularVelocity = avian3d::prelude::AngularVelocity;
+
 pub struct PhysicsPlugin;
 
 impl Plugin for PhysicsPlugin {
@@ -26,8 +43,45 @@ impl Plugin for PhysicsPlugin {
         #[cfg(feature = "avian3d")]
         if ENABLE_PHYSICS {
             app.add_plugins(PhysicsPlugins::default());
+
+            if DEBUG_RENDER{
+                app.add_plugins(PhysicsDebugPlugin::default());
+            }
         }
     }
+}
+
+#[cfg(feature = "bevy_rapier3d")]
+pub fn get_mass(mass: &AdditionalMassProperties) -> f32 {
+    let AdditionalMassProperties::Mass(mass) = mass else {
+        panic!()
+    };
+    *mass
+}
+
+#[cfg(feature = "avian3d")]
+pub fn get_mass(mass: &Mass) -> f32 {
+    mass.0
+}
+
+#[cfg(feature = "bevy_rapier3d")]
+pub fn linear_velocity(velocity: &LinearVelocity) -> Vec3 {
+    velocity.linvel
+}
+
+#[cfg(feature = "avian3d")]
+pub fn linear_velocity(velocity: &LinearVelocity) -> Vec3 {
+    velocity.0
+}
+
+#[cfg(feature = "bevy_rapier3d")]
+pub fn angular_velocity(velocity: &AngularVelocity) -> Vec3 {
+    velocity.angvel
+}
+
+#[cfg(feature = "avian3d")]
+pub fn angular_velocity(velocity: &AngularVelocity) -> Vec3 {
+    velocity.0
 }
 
 pub fn backend_used() -> &'static str {
@@ -78,10 +132,10 @@ pub fn rigid_body_dynamic() -> RigidBody {
 
 pub fn gravity_scale(scale: f32) -> GravityScale {
     #[cfg(feature = "bevy_rapier3d")]
-    let gravity_scale = GravityScale(20.0);
+    let gravity_scale = GravityScale(scale);
 
     #[cfg(feature = "avian3d")]
-    let gravity_scale = GravityScale(20.0);
+    let gravity_scale = GravityScale(scale);
 
     gravity_scale
 }
