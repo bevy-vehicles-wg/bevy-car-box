@@ -5,7 +5,8 @@ use bevy::prelude::*;
 pub use bevy_rapier3d::prelude::*;
 
 pub const ENABLE_PHYSICS: bool = true;
-pub const DEBUG_RENDER: bool = false;
+pub const DEBUG_RENDER: bool = true;
+pub const DEBUG_RENDER_ALL: bool = false;
 
 #[cfg(feature = "bevy_rapier3d")]
 pub type Mass = AdditionalMassProperties;
@@ -33,10 +34,14 @@ impl Plugin for PhysicsPlugin {
             app.add_plugins(RapierPhysicsPlugin::<NoUserData>::default());
 
             if DEBUG_RENDER {
-                app.add_plugins(RapierDebugRenderPlugin {
-                    mode: DebugRenderMode::all(),
-                    ..default()
-                });
+                if DEBUG_RENDER_ALL {
+                    app.add_plugins(RapierDebugRenderPlugin {
+                        mode: DebugRenderMode::all(),
+                        ..default()
+                    });
+                } else {
+                    app.add_plugins(RapierDebugRenderPlugin::default());
+                }
             }
         }
 
