@@ -154,9 +154,13 @@ fn setup_car(
 
     let obstacle_size = 60.0;
     let obstacle = Cuboid::new(obstacle_size, obstacle_size, obstacle_size);
-    let obstacle_collider = Collider::cuboid(obstacle_size / 2.0, obstacle_size / 2.0, obstacle_size / 2.0);
-    commands.spawn(
-        (PbrBundle {
+    let obstacle_collider = Collider::cuboid(
+        obstacle_size / 2.0,
+        obstacle_size / 2.0,
+        obstacle_size / 2.0,
+    );
+    commands.spawn((
+        PbrBundle {
             mesh: meshes.add(obstacle),
             material: materials.add(Color::Srgba(ORANGE)),
             transform: Transform {
@@ -167,8 +171,7 @@ fn setup_car(
             ..default()
         },
         obstacle_collider,
-        ),
-    );
+    ));
 }
 
 fn movements(
@@ -306,16 +309,15 @@ fn update_car(
     );
 
     let car_direction = *car_transform.forward();
+    let car_torque = mass * car_speed * delta_seconds;
 
     for movement in events.read() {
         match movement {
             Movement::Forward => {
-                let longitudinal_force = wheel_forward_direction * mass * car_speed * delta_seconds;
-
-                let lateral_counter_force =
-                    wheel_lateral_direction * mass * car_speed * delta_seconds;
-
+                let longitudinal_force = wheel_forward_direction * car_torque;
+                let lateral_counter_force = wheel_lateral_direction * car_torque;
                 let total_force = longitudinal_force * 1.5 + lateral_counter_force * 1.1;
+
                 physics::add_external_impulse(
                     &mut car_impulse,
                     total_force,
@@ -326,18 +328,16 @@ fn update_car(
                 // push the car to rotate to align the wheel direction
                 physics::add_external_impulse(
                     &mut car_impulse,
-                    wheel_lateral_direction * mass * car_speed * delta_seconds * 1.0,
+                    wheel_lateral_direction * car_torque * 1.0,
                     car_front,
                     Vec3::ZERO,
                 );
             }
             Movement::Backward => {
-                let longitudinal_force = wheel_forward_direction * mass * car_speed * delta_seconds;
-
-                let lateral_counter_force =
-                    wheel_lateral_direction * mass * car_speed * delta_seconds;
-
+                let longitudinal_force = wheel_forward_direction * car_torque;
+                let lateral_counter_force = wheel_lateral_direction * car_torque;
                 let total_force = longitudinal_force * 1.5 + lateral_counter_force * 1.1;
+
                 physics::add_external_impulse(
                     &mut car_impulse,
                     -total_force,
@@ -348,7 +348,7 @@ fn update_car(
                 // push the car to rotate to align the wheel direction
                 physics::add_external_impulse(
                     &mut car_impulse,
-                    wheel_lateral_direction * mass * car_speed * delta_seconds * 1.0,
+                    wheel_lateral_direction * car_torque * 1.0,
                     car_back,
                     Vec3::ZERO,
                 );
