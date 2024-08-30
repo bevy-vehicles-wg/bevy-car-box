@@ -1,20 +1,13 @@
+//#![deny(warnings)]
 use crate::debug_plugin::DebugPlugin;
 use crate::physics::*;
 use bevy::color::palettes::basic::*;
 use bevy::color::palettes::css::*;
-use bevy::core_pipeline::motion_blur::{MotionBlur, MotionBlurBundle};
 use bevy::math::vec3;
-use bevy::pbr::ExtendedMaterial;
-use bevy::window::PresentMode;
-use bevy::{
-    pbr::{CascadeShadowConfigBuilder, DirectionalLightShadowMap},
-    prelude::*,
-};
+use bevy::prelude::*;
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 use bevy_trackball::prelude::*;
 use std::f32::consts::*;
-use std::sync::{Arc, Mutex};
-use std::time::Instant;
 
 pub mod camera_config;
 pub mod debug_plugin;
@@ -60,7 +53,7 @@ enum Movement {
     Backward,
 }
 
-fn setup_camera(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn setup_camera(mut commands: Commands) {
     let eye = vec3(0.0, 40.0, 40.0);
     let target = vec3(0.0, 0.0, 0.0);
     let up = Vec3::Y;
@@ -177,7 +170,6 @@ fn setup_car(
 fn movements(
     time: Res<Time>,
     keys: Res<ButtonInput<KeyCode>>,
-    car: Query<&Car>,
     mut wheel: Query<(&mut Transform, &mut Wheel)>,
     mut movement_writer: EventWriter<Movement>,
 ) {
@@ -213,7 +205,6 @@ fn update_car(
     mut car: Query<
         (
             &mut ExternalImpulse,
-            &mut ExternalForce,
             &physics::LinearVelocity,
             &physics::AngularVelocity,
             &physics::Mass,
@@ -229,7 +220,6 @@ fn update_car(
     let delta_seconds = time.delta_seconds();
     let (
         mut car_impulse,
-        mut car_force,
         linear_velocity,
         angular_velocity,
         mass,
@@ -259,7 +249,6 @@ fn update_car(
     let (wheel_transform, wheel) = wheel.single();
     let global_wheel_transform = *car_transform * *wheel_transform;
     let car_position = car_transform.translation;
-    let wheel_direction = *global_wheel_transform.forward();
     let car_forward = *car_transform.forward();
 
     // GRAY arrow points where the car body is heading to
@@ -277,7 +266,6 @@ fn update_car(
 
     let car_front = car_transform.forward() * car.length / 2.0;
     let car_back = car_transform.back() * car.length / 2.0;
-    let global_car_front = car_transform.translation + car_front;
 
     let wheel_lateral_direction = wheel.angle.sin() * global_wheel_transform.left();
     let wheel_forward_direction = wheel.angle.cos() * global_wheel_transform.forward();
@@ -294,7 +282,7 @@ fn update_car(
         Color::Srgba(PINK),
     );
 
-    /// lateral counter force
+    // lateral counter force
     gizmos.arrow(
         car_position,
         car_position + wheel_lateral_force,
@@ -308,7 +296,6 @@ fn update_car(
         Color::Srgba(WHITE),
     );
 
-    let car_direction = *car_transform.forward();
     let car_torque = mass * car_speed * delta_seconds;
 
     for movement in events.read() {
@@ -353,7 +340,6 @@ fn update_car(
                     Vec3::ZERO,
                 );
             }
-            _ => (),
         }
     }
 }
