@@ -157,7 +157,7 @@ fn setup_car(
             mesh: meshes.add(obstacle),
             material: materials.add(Color::Srgba(ORANGE)),
             transform: Transform {
-                translation: vec3(0.0, -20.0, -40.0),
+                translation: vec3(10.0, -20.0, -40.0),
                 rotation: Quat::from_rotation_x(30f32.to_radians()),
                 ..default()
             },
@@ -213,7 +213,7 @@ fn update_car(
         ),
         With<Car>,
     >,
-    wheel: Query<(&mut Transform, &Wheel), (With<Wheel>, Without<Car>)>,
+    mut wheel_query: Query<(&mut Transform, &mut Wheel), (With<Wheel>, Without<Car>)>,
     mut events: EventReader<Movement>,
 ) {
     let car_speed = 20.0;
@@ -246,7 +246,7 @@ fn update_car(
         Color::Srgba(BLUE),
     );
 
-    let (wheel_transform, wheel) = wheel.single();
+    let (wheel_transform, mut wheel) = wheel_query.single_mut();
     let global_wheel_transform = *car_transform * *wheel_transform;
     let car_position = car_transform.translation;
     let car_forward = *car_transform.forward();
@@ -266,33 +266,46 @@ fn update_car(
 
     let car_front = car_transform.forward() * car.length / 2.0;
     let car_back = car_transform.back() * car.length / 2.0;
+    let car_left = car_transform.left() * car.width / 2.0;
+    let car_right = car_transform.right() * car.width / 2.0;
+
+    let front_tire_left = car_front * 0.75 + car_left * 0.75;
+    let front_tire_right = car_front * 0.75 + car_right * 0.75;
+    let rear_tire_left = car_back * 0.75 + car_left * 0.75;
+    let rear_tire_right = car_back * 0.75 + car_right * 0.75;
+
+    let upward = car_transform.up();
+    let upward_force = upward * mass * delta_seconds * 8.0;
+
+    // car tires
+    gizmos.arrow(car_position + front_tire_left, car_position + front_tire_left + upward * 10.0, Color::Srgba(FUCHSIA));
+    gizmos.arrow(car_position + front_tire_right, car_position + front_tire_right + upward * 10.0, Color::Srgba(FUCHSIA));
+    gizmos.arrow(car_position + rear_tire_left, car_position + rear_tire_left + upward * 10.0, Color::Srgba(FUCHSIA));
+    gizmos.arrow(car_position + rear_tire_right, car_position + rear_tire_right + upward * 10.0, Color::Srgba(FUCHSIA));
+
 
     let wheel_lateral_direction = wheel.angle.sin() * global_wheel_transform.left();
     let wheel_forward_direction = wheel.angle.cos() * global_wheel_transform.forward();
 
-    let acceleration = 10.0;
-    let wheel_lateral_force = wheel_lateral_direction * acceleration;
-    let wheel_forward_force = wheel_forward_direction * acceleration;
-    let total_force = (wheel_forward_direction + wheel_lateral_direction) * acceleration;
 
     // longitudinal forward force
     gizmos.arrow(
         car_position,
-        car_position + wheel_forward_force,
+        car_position + wheel_forward_direction * 10.0,
         Color::Srgba(PINK),
     );
 
     // lateral counter force
     gizmos.arrow(
         car_position,
-        car_position + wheel_lateral_force,
+        car_position + wheel_lateral_direction * 10.0,
         Color::Srgba(YELLOW),
     );
 
     // main force
     gizmos.arrow(
         car_position,
-        car_position + total_force,
+        car_position + (wheel_forward_direction + wheel_lateral_direction) * 10.0,
         Color::Srgba(WHITE),
     );
 
@@ -319,6 +332,7 @@ fn update_car(
                     car_front,
                     Vec3::ZERO,
                 );
+
             }
             Movement::Backward => {
                 let longitudinal_force = wheel_forward_direction * car_torque;
