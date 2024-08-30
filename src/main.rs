@@ -241,8 +241,6 @@ fn update_car(
     let wheel_direction = *global_wheel_transform.forward();
     let car_forward = *car_transform.forward();
 
-    //// WHITE arrow points where the wheel is heading to
-    //gizmos.arrow(car_position, car_position + wheel_direction * 10.0, Color::Srgba(WHITE));
     // GRAY arrow points where the car body is heading to
     gizmos.arrow(
         car_position,
