@@ -77,7 +77,7 @@ fn setup_car(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     commands.spawn(InfiniteGridBundle::default());
-    let car_scale = 1.0;
+    let car_scale = 5.0;
     let car_length = 3.0 * car_scale;
     let car_width = 2.0 * car_scale;
     let car_height = 1.5 * car_scale;
@@ -102,7 +102,7 @@ fn setup_car(
             physics::LinearVelocity::default(),
             #[cfg(feature = "avian3d")]
             physics::AngularVelocity::default(),
-            Friction::new(1.0),
+            //Friction::new(1.0),
             Car {
                 width: car_width,
                 length: car_length,
@@ -332,8 +332,8 @@ fn update_car(
                 // push the car to rotate to align the wheel direction
                 physics::add_external_impulse(
                     &mut car_impulse,
-                    -wheel_lateral_direction * mass * car_speed * delta_seconds * 1.0,
-                    car_front,
+                    wheel_lateral_direction * mass * car_speed * delta_seconds * 1.0,
+                    car_back,
                     Vec3::ZERO,
                 );
 
