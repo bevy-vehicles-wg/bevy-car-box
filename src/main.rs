@@ -23,8 +23,8 @@ fn main() {
         .add_plugins(physics::PhysicsPlugin)
         .add_systems(Startup, setup_camera)
         .add_systems(Startup, setup_car)
-        .add_systems(Update, movements)
-        .add_systems(FixedUpdate, update_car)
+        //.add_systems(Update, movements)
+        //.add_systems(FixedUpdate, update_car)
         .insert_resource(AmbientLight {
             color: Color::WHITE,
             brightness: 1000.0,
@@ -54,7 +54,7 @@ enum Movement {
 }
 
 fn setup_camera(mut commands: Commands) {
-    let eye = vec3(0.0, 40.0, 40.0);
+    let eye = vec3(0.0, 20.0, 20.0);
     let target = vec3(0.0, 0.0, 0.0);
     let up = Vec3::Y;
     commands.spawn((
@@ -70,63 +70,6 @@ fn setup_car(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     commands.spawn(InfiniteGridBundle::default());
-    let car_scale = 5.0;
-    let car_length = 3.0 * car_scale;
-    let car_width = 2.0 * car_scale;
-    let car_height = 1.5 * car_scale;
-    let collider = Collider::cuboid(car_width / 2.0, car_height / 2.0, car_length / 2.0);
-    let car = commands
-        .spawn((
-            PbrBundle {
-                mesh: meshes.add(Cuboid::new(car_width, car_height, car_length)),
-                material: materials.add(Color::Srgba(GREEN).with_alpha(0.5)),
-                transform: Transform {
-                    translation: vec3(0.0, 4.0, 10.0),
-                    scale: Vec3::splat(1.0),
-                    ..default()
-                },
-                ..default()
-            },
-            collider,
-            physics::mass(2000.0),
-            physics::external_impulse(),
-            physics::external_force(),
-            physics::rigid_body_dynamic(),
-            physics::LinearVelocity::default(),
-            #[cfg(feature = "avian3d")]
-            physics::AngularVelocity::default(),
-            //Friction::new(1.0),
-            Car {
-                width: car_width,
-                length: car_length,
-                height: car_height,
-            },
-        ))
-        .id();
-    let mut tire_mesh: Mesh = Cylinder::new(0.4, 0.4).into();
-    tire_mesh.rotate_by(Quat::from_rotation_z(FRAC_PI_2));
-
-    let wheel = commands
-        .spawn((
-            PbrBundle {
-                mesh: meshes.add(tire_mesh),
-                material: materials.add(Color::Srgba(RED)),
-                transform: Transform {
-                    translation: vec3(1.2, 0.0, -1.0),
-                    ..default()
-                },
-                ..default()
-            },
-            Wheel {
-                angle: 0.0,
-                max_angle: 30f32.to_radians(),
-                min_angle: -30f32.to_radians(),
-            },
-        ))
-        .id();
-
-    commands.entity(car).add_child(wheel);
-
     let ground_size = 10_000.0;
     let ground_thickness = 1.0;
     let ground_collider = Collider::cuboid(ground_size, ground_thickness, ground_size);
@@ -165,6 +108,162 @@ fn setup_car(
         },
         obstacle_collider,
     ));
+
+
+    const CAR_GROUP: Group = Group::GROUP_1;
+
+    let car_scale = 2.0;
+
+    let car_length = 0.9 * car_scale;
+    let car_width = 0.85 * car_scale;
+    let car_height = 0.3 * car_scale;
+
+    let wheel_height = car_height * -Vec3::Y;
+    let car_front = car_length * -Vec3::Z;
+    let car_back = car_length * Vec3::Z;
+    let car_left = car_width * -Vec3::X;
+    let car_right = car_width * Vec3::X;
+
+    let tire_front_left = car_front * 0.95 + car_left * 0.85 + wheel_height * 0.75;
+    let tire_front_right = car_front * 0.95 + car_right * 0.85 + wheel_height * 0.75;
+    let tire_rear_left = car_back * 0.95 + car_left * 0.85 + wheel_height * 0.75;
+    let tire_rear_right = car_back * 0.95 + car_right * 0.85 + wheel_height * 0.75;
+
+    let wheel_params = [
+        tire_front_left,
+        tire_front_right,
+        tire_rear_left,
+        tire_rear_right,
+    ];
+    // TODO: lower center of mass?
+    // let mut center_of_mass = wheel_params.iter().sum().unwrap() / 4.0;
+    // center_of_mass.y = 0.0;
+
+    let suspension_height = 1.0;
+    let max_steering_angle = 35.0f32.to_radians();
+    let drive_strength = 1.0;
+    let wheel_radius = 0.28 * car_scale;
+    let car_position = vec3(0.0, wheel_radius + suspension_height, 0.0);
+
+    let body_position_in_car_space = car_position;
+
+    let car_body = Cuboid {
+        half_size: vec3(car_width, car_height, car_length),
+    };
+
+    let car_collider = Collider::cuboid(car_width, car_height, car_length);
+
+    let car_entity = commands
+        .spawn((
+            PbrBundle {
+                mesh: meshes.add(car_body),
+                material: materials.add(Color::Srgba(GREEN)),
+                transform: Transform {
+                    translation: vec3(0.0, 10.0, 0.0),
+                    ..default()
+                },
+                ..default()
+            },
+            physics::rigid_body_dynamic(),
+            car_collider,
+        ))
+        .id();
+
+    for (wheel_id, wheel_pos_in_car_space) in wheel_params.into_iter().enumerate() {
+        let is_front = wheel_id >= 2;
+        let is_left = wheel_id == 0 || wheel_id == 2;
+        let is_right = wheel_id == 1 || wheel_id == 3;
+        let wheel_center = car_position + wheel_pos_in_car_space;
+
+        let wheel_thickness = wheel_radius / 2.0;
+        let axle_mass_props = MassProperties {
+            mass: 100.0,
+            ..default()
+        };
+        let axle_mesh = Cuboid::new(2.0, 0.1, 0.1);
+        let axle_co = Collider::cuboid(2.0, 0.1, 0.1);
+        let axle_handle = commands
+            .spawn((
+                PbrBundle {
+                    mesh: meshes.add(axle_mesh),
+                    material: materials.add(Color::Srgba(YELLOW)),
+                    transform: Transform {
+                        translation: wheel_center,
+                        ..default()
+                    },
+                    ..default()
+                },
+                // dont put the axle collider here
+                physics::rigid_body_dynamic(),
+                CollisionGroups::new(CAR_GROUP, !CAR_GROUP),
+                AdditionalMassProperties::MassProperties(axle_mass_props),
+            ))
+            .id();
+
+        let mut locked_axes = JointAxesMask::LIN_X
+            | JointAxesMask::LIN_Z
+            | JointAxesMask::ANG_X
+            | JointAxesMask::ANG_Z;
+
+        if !is_front {
+            locked_axes |= JointAxesMask::ANG_Y;
+        }
+
+        let suspension_attachment_in_body_space =
+            wheel_pos_in_car_space - body_position_in_car_space;
+
+        let mut suspension_joint = GenericJointBuilder::new(locked_axes)
+            .limits(JointAxis::LinY, [0.0, suspension_height])
+            .motor_position(JointAxis::LinY, 0.0, 1.0e4, 1.0e3)
+            .local_anchor1(suspension_attachment_in_body_space);
+
+        if is_front {
+            suspension_joint =
+                suspension_joint.limits(JointAxis::AngY, [-max_steering_angle, max_steering_angle]);
+        }
+
+        commands.entity(axle_handle).with_children(|children| {
+            children.spawn(ImpulseJoint::new(
+                car_entity,
+                TypedJoint::GenericJoint(suspension_joint.build()),
+            ));
+        });
+
+        let wheel_mesh = Sphere::new(wheel_radius);
+        let wheel_co = Collider::ball(wheel_radius);
+        //let wheel_mesh =  Cylinder{
+        //    half_height: wheel_thickness,
+        //    radius: wheel_radius,
+        //};
+
+        //let wheel_co = Collider::cylinder(wheel_thickness, wheel_radius);
+
+        let wheel_loc = if is_left {
+            wheel_center - 1.0 * Vec3::X
+        }else{
+            wheel_center + 1.0 * Vec3::X
+        };
+        let wheel_entity = commands
+            .spawn((
+                PbrBundle {
+                    mesh: meshes.add(wheel_mesh),
+                    material: materials.add(Color::Srgba(RED)),
+                    transform: Transform {
+                        translation: wheel_center,
+                        ..default()
+                    },
+                    ..default()
+                },
+                wheel_co,
+                physics::rigid_body_dynamic(),
+            ))
+            .id();
+
+        let wheel_joint = RevoluteJointBuilder::new(Vec3::X);
+        commands.entity(wheel_entity).with_children(|children| {
+            children.spawn(ImpulseJoint::new(axle_handle, wheel_joint));
+        });
+    }
 }
 
 fn movements(
@@ -218,14 +317,8 @@ fn update_car(
 ) {
     let car_speed = 20.0;
     let delta_seconds = time.delta_seconds();
-    let (
-        mut car_impulse,
-        linear_velocity,
-        angular_velocity,
-        mass,
-        car_transform,
-        car,
-    ) = car.single_mut();
+    let (mut car_impulse, linear_velocity, angular_velocity, mass, car_transform, car) =
+        car.single_mut();
     let mass = physics::get_mass(mass);
 
     let linear_velocity = physics::linear_velocity(linear_velocity);
@@ -278,15 +371,29 @@ fn update_car(
     let upward_force = upward * mass * delta_seconds * 8.0;
 
     // car tires
-    gizmos.arrow(car_position + front_tire_left, car_position + front_tire_left + upward * 10.0, Color::Srgba(FUCHSIA));
-    gizmos.arrow(car_position + front_tire_right, car_position + front_tire_right + upward * 10.0, Color::Srgba(FUCHSIA));
-    gizmos.arrow(car_position + rear_tire_left, car_position + rear_tire_left + upward * 10.0, Color::Srgba(FUCHSIA));
-    gizmos.arrow(car_position + rear_tire_right, car_position + rear_tire_right + upward * 10.0, Color::Srgba(FUCHSIA));
-
+    gizmos.arrow(
+        car_position + front_tire_left,
+        car_position + front_tire_left + upward * 10.0,
+        Color::Srgba(FUCHSIA),
+    );
+    gizmos.arrow(
+        car_position + front_tire_right,
+        car_position + front_tire_right + upward * 10.0,
+        Color::Srgba(FUCHSIA),
+    );
+    gizmos.arrow(
+        car_position + rear_tire_left,
+        car_position + rear_tire_left + upward * 10.0,
+        Color::Srgba(FUCHSIA),
+    );
+    gizmos.arrow(
+        car_position + rear_tire_right,
+        car_position + rear_tire_right + upward * 10.0,
+        Color::Srgba(FUCHSIA),
+    );
 
     let wheel_lateral_direction = wheel.angle.sin() * global_wheel_transform.left();
     let wheel_forward_direction = wheel.angle.cos() * global_wheel_transform.forward();
-
 
     // longitudinal forward force
     gizmos.arrow(
@@ -332,7 +439,6 @@ fn update_car(
                     car_front,
                     Vec3::ZERO,
                 );
-
             }
             Movement::Backward => {
                 let longitudinal_force = wheel_forward_direction * car_torque;
