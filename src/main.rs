@@ -151,6 +151,24 @@ fn setup_car(
         ground_collider,
         Friction::new(1.0),
     ));
+
+    let obstacle_size = 60.0;
+    let obstacle = Cuboid::new(obstacle_size, obstacle_size, obstacle_size);
+    let obstacle_collider = Collider::cuboid(obstacle_size / 2.0, obstacle_size / 2.0, obstacle_size / 2.0);
+    commands.spawn(
+        (PbrBundle {
+            mesh: meshes.add(obstacle),
+            material: materials.add(Color::Srgba(ORANGE)),
+            transform: Transform {
+                translation: vec3(0.0, -20.0, -40.0),
+                rotation: Quat::from_rotation_x(30f32.to_radians()),
+                ..default()
+            },
+            ..default()
+        },
+        obstacle_collider,
+        ),
+    );
 }
 
 fn movements(
@@ -204,7 +222,7 @@ fn update_car(
     wheel: Query<(&mut Transform, &Wheel), (With<Wheel>, Without<Car>)>,
     mut events: EventReader<Movement>,
 ) {
-    let car_speed = 10.0;
+    let car_speed = 20.0;
     let delta_seconds = time.delta_seconds();
     let (
         mut car_impulse,
@@ -292,8 +310,7 @@ fn update_car(
     for movement in events.read() {
         match movement {
             Movement::Forward => {
-                let longitudinal_force =
-                    wheel_forward_direction * mass * car_speed * delta_seconds;
+                let longitudinal_force = wheel_forward_direction * mass * car_speed * delta_seconds;
 
                 let lateral_counter_force =
                     wheel_lateral_direction * mass * car_speed * delta_seconds;
@@ -315,8 +332,7 @@ fn update_car(
                 );
             }
             Movement::Backward => {
-                let longitudinal_force =
-                    wheel_forward_direction * mass * car_speed * delta_seconds;
+                let longitudinal_force = wheel_forward_direction * mass * car_speed * delta_seconds;
 
                 let lateral_counter_force =
                     wheel_lateral_direction * mass * car_speed * delta_seconds;
@@ -336,7 +352,6 @@ fn update_car(
                     car_back,
                     Vec3::ZERO,
                 );
-
             }
             _ => (),
         }
