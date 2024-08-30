@@ -42,7 +42,6 @@ fn main() {
 
 #[derive(Component)]
 struct Car {
-    angle: f32,
     width: f32,
     length: f32,
     height: f32,
@@ -78,9 +77,10 @@ fn setup_car(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     commands.spawn(InfiniteGridBundle::default());
-    let car_length = 3.0;
-    let car_width = 2.0;
-    let car_height = 1.5;
+    let car_scale = 1.0;
+    let car_length = 3.0 * car_scale;
+    let car_width = 2.0 * car_scale;
+    let car_height = 1.5 * car_scale;
     let collider = Collider::cuboid(car_width / 2.0, car_height / 2.0, car_length / 2.0);
     let car = commands
         .spawn((
@@ -89,6 +89,7 @@ fn setup_car(
                 material: materials.add(Color::Srgba(GREEN).with_alpha(0.5)),
                 transform: Transform {
                     translation: vec3(0.0, 4.0, 10.0),
+                    scale: Vec3::splat(1.0),
                     ..default()
                 },
                 ..default()
@@ -103,7 +104,6 @@ fn setup_car(
             physics::AngularVelocity::default(),
             Friction::new(1.0),
             Car {
-                angle: 0.0,
                 width: car_width,
                 length: car_length,
                 height: car_height,
@@ -237,14 +237,18 @@ fn update_car(
 
     let (wheel_transform, wheel) = wheel.single();
     let global_wheel_transform = *car_transform * *wheel_transform;
-    let start = car_transform.translation;
+    let car_position = car_transform.translation;
     let wheel_direction = *global_wheel_transform.forward();
     let car_forward = *car_transform.forward();
 
-    // WHITE arrow points where the wheel is heading to
-    gizmos.arrow(start, start + wheel_direction * 10.0, Color::Srgba(WHITE));
+    //// WHITE arrow points where the wheel is heading to
+    //gizmos.arrow(car_position, car_position + wheel_direction * 10.0, Color::Srgba(WHITE));
     // GRAY arrow points where the car body is heading to
-    gizmos.arrow(start, start + car_forward * 10.0, Color::Srgba(GRAY));
+    gizmos.arrow(
+        car_position,
+        car_position + car_forward * 10.0,
+        Color::Srgba(GRAY),
+    );
     // RED arrow points where the wheel is heading to, oriented at the wheel location
     gizmos.arrow(
         global_wheel_transform.translation,
@@ -255,11 +259,34 @@ fn update_car(
     let car_front = car_transform.forward() * car.length / 2.0;
     let car_back = car_transform.back() * car.length / 2.0;
     let global_car_front = car_transform.translation + car_front;
-    let wheel_lateral = wheel.angle.sin() * global_wheel_transform.left();
+
+    let wheel_lateral_direction = wheel.angle.sin() * global_wheel_transform.left();
+    let wheel_forward_direction = wheel.angle.cos() * global_wheel_transform.forward();
+
+    let acceleration = 10.0;
+    let wheel_lateral_force = wheel_lateral_direction * acceleration;
+    let wheel_forward_force = wheel_forward_direction * acceleration;
+    let total_force = (wheel_forward_direction + wheel_lateral_direction) * acceleration;
+
+    // longitudinal forward force
     gizmos.arrow(
-        global_car_front,
-        global_car_front + wheel_lateral * 10.0,
+        car_position,
+        car_position + wheel_forward_force,
+        Color::Srgba(PINK),
+    );
+
+    /// lateral counter force
+    gizmos.arrow(
+        car_position,
+        car_position + wheel_lateral_force,
         Color::Srgba(YELLOW),
+    );
+
+    // main force
+    gizmos.arrow(
+        car_position,
+        car_position + total_force,
+        Color::Srgba(WHITE),
     );
 
     let car_direction = *car_transform.forward();
@@ -267,17 +294,16 @@ fn update_car(
     for movement in events.read() {
         match movement {
             Movement::Forward => {
-                physics::add_external_impulse(
-                    &mut car_impulse,
-                    car_direction * mass * car_speed * delta_seconds * 2.0,
-                    Vec3::ZERO,
-                    Vec3::ZERO,
-                );
+                let longitudinal_force =
+                    wheel_forward_direction * mass * car_speed * delta_seconds;
 
-                // the wheel dont want to go here, counter force
+                let lateral_counter_force =
+                    wheel_lateral_direction * mass * car_speed * delta_seconds;
+
+                let total_force = longitudinal_force * 1.5 + lateral_counter_force * 1.1;
                 physics::add_external_impulse(
                     &mut car_impulse,
-                    wheel_lateral * mass * car_speed * delta_seconds * 4.0,
+                    total_force,
                     Vec3::ZERO,
                     Vec3::ZERO,
                 );
@@ -285,23 +311,22 @@ fn update_car(
                 // push the car to rotate to align the wheel direction
                 physics::add_external_impulse(
                     &mut car_impulse,
-                    wheel_lateral * mass * car_speed * delta_seconds * 0.5,
+                    wheel_lateral_direction * mass * car_speed * delta_seconds * 1.0,
                     car_front,
                     Vec3::ZERO,
                 );
             }
             Movement::Backward => {
-                physics::add_external_impulse(
-                    &mut car_impulse,
-                    -car_direction * mass * car_speed * delta_seconds * 2.0,
-                    Vec3::ZERO,
-                    Vec3::ZERO,
-                );
+                let longitudinal_force =
+                    wheel_forward_direction * mass * car_speed * delta_seconds;
 
-                // the wheel dont want to go here, counter force
+                let lateral_counter_force =
+                    wheel_lateral_direction * mass * car_speed * delta_seconds;
+
+                let total_force = longitudinal_force * 1.5 + lateral_counter_force * 1.1;
                 physics::add_external_impulse(
                     &mut car_impulse,
-                    wheel_lateral * mass * car_speed * delta_seconds * 4.0,
+                    -total_force,
                     Vec3::ZERO,
                     Vec3::ZERO,
                 );
@@ -309,7 +334,7 @@ fn update_car(
                 // push the car to rotate to align the wheel direction
                 physics::add_external_impulse(
                     &mut car_impulse,
-                    -wheel_lateral * mass * car_speed * delta_seconds * 0.5,
+                    -wheel_lateral_direction * mass * car_speed * delta_seconds * 1.0,
                     car_front,
                     Vec3::ZERO,
                 );
