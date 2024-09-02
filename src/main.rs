@@ -101,7 +101,7 @@ fn setup_car(
             material: materials.add(Color::Srgba(ORANGE)),
             transform: Transform {
                 translation: vec3(10.0, -20.0, -40.0),
-                rotation: Quat::from_rotation_x(30f32.to_radians()),
+                rotation: Quat::from_rotation_x(30f32.to_radians()) * Quat::from_rotation_y(-30f32.to_radians()),
                 ..default()
             },
             ..default()

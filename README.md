@@ -16,3 +16,6 @@ S - drive backward
 A - steer left
 
 D - steer right
+
+## LICENSE
+MIT
