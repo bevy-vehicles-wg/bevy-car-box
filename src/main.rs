@@ -109,6 +109,7 @@ fn setup_car(
         obstacle_collider,
     ));
 
+
     const CAR_GROUP: Group = Group::GROUP_1;
 
     let car_scale = 2.0;
@@ -179,9 +180,25 @@ fn setup_car(
             mass: 100.0,
             ..default()
         };
-
         let axle_mesh = Cuboid::new(2.0, 0.1, 0.1);
         let axle_co = Collider::cuboid(2.0, 0.1, 0.1);
+        let axle_handle = commands
+            .spawn((
+                PbrBundle {
+                    mesh: meshes.add(axle_mesh),
+                    material: materials.add(Color::Srgba(YELLOW)),
+                    transform: Transform {
+                        translation: wheel_center,
+                        ..default()
+                    },
+                    ..default()
+                },
+                // dont put the axle collider here
+                physics::rigid_body_dynamic(),
+                CollisionGroups::new(CAR_GROUP, !CAR_GROUP),
+                AdditionalMassProperties::MassProperties(axle_mass_props),
+            ))
+            .id();
 
         let mut locked_axes = JointAxesMask::LIN_X
             | JointAxesMask::LIN_Z
@@ -205,36 +222,27 @@ fn setup_car(
                 suspension_joint.limits(JointAxis::AngY, [-max_steering_angle, max_steering_angle]);
         }
 
-        let axle_handle = commands
-            .spawn((
-                PbrBundle {
-                    mesh: meshes.add(axle_mesh),
-                    material: materials.add(Color::Srgba(YELLOW)),
-                    transform: Transform {
-                        translation: wheel_center,
-                        ..default()
-                    },
-                    ..default()
-                },
-                // dont put the axle collider here
-                physics::rigid_body_dynamic(),
-                CollisionGroups::new(CAR_GROUP, !CAR_GROUP),
-                AdditionalMassProperties::MassProperties(axle_mass_props),
-                ImpulseJoint::new(
-                    car_entity,
-                    TypedJoint::GenericJoint(suspension_joint.build()),
-                ),
-            ))
-            .id();
+        commands.entity(axle_handle).with_children(|children| {
+            children.spawn(ImpulseJoint::new(
+                car_entity,
+                TypedJoint::GenericJoint(suspension_joint.build()),
+            ));
+        });
 
+        let wheel_mesh = Sphere::new(wheel_radius);
         let wheel_co = Collider::ball(wheel_radius);
-        let mut wheel_mesh: Mesh = Cylinder {
-            half_height: wheel_thickness,
-            radius: wheel_radius,
-        }
-        .into();
-        wheel_mesh.rotate_by(Quat::from_rotation_z(FRAC_PI_2));
+        //let wheel_mesh =  Cylinder{
+        //    half_height: wheel_thickness,
+        //    radius: wheel_radius,
+        //};
 
+        //let wheel_co = Collider::cylinder(wheel_thickness, wheel_radius);
+
+        let wheel_loc = if is_left {
+            wheel_center - 1.0 * Vec3::X
+        }else{
+            wheel_center + 1.0 * Vec3::X
+        };
         let wheel_entity = commands
             .spawn((
                 PbrBundle {
@@ -248,9 +256,13 @@ fn setup_car(
                 },
                 wheel_co,
                 physics::rigid_body_dynamic(),
-                ImpulseJoint::new(axle_handle, RevoluteJointBuilder::new(Vec3::X)),
             ))
             .id();
+
+        let wheel_joint = RevoluteJointBuilder::new(Vec3::X);
+        commands.entity(wheel_entity).with_children(|children| {
+            children.spawn(ImpulseJoint::new(axle_handle, wheel_joint));
+        });
     }
 }
 
